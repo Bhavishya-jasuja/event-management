@@ -1,0 +1,272 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Role {
+  PLAYER
+  OWNER
+  ADMIN
+}
+
+enum SportType {
+  CRICKET
+  FOOTBALL
+  BADMINTON
+  TENNIS
+  TURF
+  BASKETBALL
+  VOLLEYBALL
+  OTHER
+}
+
+enum VenueStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+  SUSPENDED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum SlotStatus {
+  AVAILABLE
+  BOOKED
+  BLOCKED
+}
+
+// ─── User ────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  phone         String?   @unique
+  passwordHash  String?
+  role          Role?
+  avatar        String?
+  isBlacklisted Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts       Account[]
+  sessions       Session[]
+  bookings       Booking[]
+  reviews        Review[]
+  venues         Venue[]
+  reviewedVenues Venue[]   @relation("VenueReviewedBy")
+
+  @@map("users")
+}
+
+// ─── NextAuth Tables ─────────────────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ─── Venue ───────────────────────────────────────────────────────────────────
+
+model Venue {
+  id               String      @id @default(cuid())
+  ownerId          String
+  name             String
+  description      String?
+  sportTypes       SportType[]
+  address          String
+  city             String
+  state            String
+  pincode          String
+  latitude         Float?
+  longitude        Float?
+  photos           String[]
+  amenities        String[]
+  status           VenueStatus @default(PENDING)
+  rejectionReason  String?
+  reviewedById     String?
+  reviewedAt       DateTime?
+  isActive         Boolean     @default(true)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  owner      User     @relation(fields: [ownerId], references: [id])
+  reviewedBy User?    @relation("VenueReviewedBy", fields: [reviewedById], references: [id])
+  courts     Court[]
+  reviews    Review[]
+
+  @@map("venues")
+}
+
+// ─── Court ───────────────────────────────────────────────────────────────────
+
+model Court {
+  id        String    @id @default(cuid())
+  venueId   String
+  name      String
+  sportType SportType
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  venue       Venue        @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  slotConfigs SlotConfig[]
+  slots       Slot[]
+
+  @@map("courts")
+}
+
+// ─── SlotConfig ──────────────────────────────────────────────────────────────
+
+model SlotConfig {
+  id           String   @id @default(cuid())
+  courtId      String
+  dayOfWeek    Int
+  openTime     String
+  closeTime    String
+  slotDuration Int
+  pricePerSlot Float
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  court Court @relation(fields: [courtId], references: [id], onDelete: Cascade)
+
+  @@unique([courtId, dayOfWeek])
+  @@map("slot_configs")
+}
+
+// ─── Slot ────────────────────────────────────────────────────────────────────
+
+model Slot {
+  id        String     @id @default(cuid())
+  courtId   String
+  date      DateTime   @db.Date
+  startTime String
+  endTime   String
+  price     Float
+  status    SlotStatus @default(AVAILABLE)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  court   Court    @relation(fields: [courtId], references: [id], onDelete: Cascade)
+  booking Booking?
+
+  @@unique([courtId, date, startTime])
+  @@map("slots")
+}
+
+// ─── Booking ─────────────────────────────────────────────────────────────────
+
+model Booking {
+  id                 String        @id @default(cuid())
+  bookingRef         String        @unique @default(cuid())
+  groupRef           String?
+  playerId           String
+  slotId             String        @unique
+  status             BookingStatus @default(PENDING)
+  totalAmount        Float
+  notes              String?
+  cancellationReason String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  player  User     @relation(fields: [playerId], references: [id])
+  slot    Slot     @relation(fields: [slotId], references: [id])
+  payment Payment?
+
+  @@map("bookings")
+}
+
+// ─── Payment ─────────────────────────────────────────────────────────────────
+
+model Payment {
+  id                String        @id @default(cuid())
+  bookingId         String        @unique
+  razorpayOrderId   String?       @unique
+  razorpayPaymentId String?       @unique
+  razorpaySignature String?
+  amount            Float
+  currency          String        @default("INR")
+  status            PaymentStatus @default(PENDING)
+  refundId          String?
+  refundedAt        DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id])
+
+  @@map("payments")
+}
+
+// ─── Review ──────────────────────────────────────────────────────────────────
+
+model Review {
+  id        String   @id @default(cuid())
+  playerId  String
+  venueId   String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  player User  @relation(fields: [playerId], references: [id])
+  venue  Venue @relation(fields: [venueId], references: [id])
+
+  @@unique([playerId, venueId])
+  @@map("reviews")
+}

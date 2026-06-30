@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "SportType" ADD VALUE 'VOLLEYBALL';
