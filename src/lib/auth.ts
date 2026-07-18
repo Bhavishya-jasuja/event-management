@@ -8,7 +8,7 @@ import type { Role } from "@/generated/prisma/enums";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
-  session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60, updateAge: 0 },
+  session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60, updateAge: 60 },
   pages: {
     signIn: "/login",
   },
@@ -55,15 +55,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id;
         token.role = (user as { role: Role }).role;
       }
-      // Always fetch fresh role from DB so it stays in sync
+      // Fetch fresh role from DB so changes reflect within updateAge seconds
       if (token.email) {
-        const dbUser = await prisma.user.findUnique({
-          where: { email: token.email },
-          select: { role: true, id: true },
-        });
-        if (dbUser) {
-          token.role = dbUser.role;
-          token.id = dbUser.id;
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { email: token.email },
+            select: { role: true, id: true },
+          });
+          if (dbUser) {
+            token.role = dbUser.role;
+            token.id = dbUser.id;
+          }
+        } catch {
+          // DB unavailable — keep existing token values
         }
       }
       return token;

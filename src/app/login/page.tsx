@@ -55,7 +55,8 @@ function LoginContent() {
       const sessionRes = await fetch("/api/auth/session");
       const session = await sessionRes.json();
       const role = session?.user?.role;
-      router.push(role === "OWNER" ? "/owner/dashboard" : "/dashboard");
+      const dest = role === "ADMIN" ? "/admin/dashboard" : role === "OWNER" ? "/owner/dashboard" : "/dashboard";
+      window.location.href = dest;
     }
   }
 

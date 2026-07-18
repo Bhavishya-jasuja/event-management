@@ -59,13 +59,19 @@ function SignupForm() {
         return;
       }
 
-      await signIn("credentials", {
+      const result = await signIn("credentials", {
         email: form.email,
         password: form.password,
         redirect: false,
       });
 
-      router.push(role === "OWNER" ? "/owner/dashboard" : "/dashboard");
+      if (result?.error) {
+        setError("Login failed after signup. Please log in manually.");
+        setLoading(false);
+        return;
+      }
+
+      window.location.href = role === "OWNER" ? "/owner/dashboard" : "/dashboard";
     } catch {
       setError("Something went wrong. Please try again.");
       setLoading(false);
