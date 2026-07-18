@@ -16,7 +16,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      allowDangerousEmailAccountLinking: true,
     }),
     CredentialsProvider({
       name: "credentials",
@@ -50,6 +49,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
+    async signIn({ user, account }) {
+      // Set default PLAYER role for new Google OAuth signups
+      if (account?.provider === "google" && user?.email) {
+        try {
+          const dbUser = await prisma.user.findUnique({ where: { email: user.email }, select: { role: true } });
+          if (dbUser && !dbUser.role) {
+            await prisma.user.update({ where: { email: user.email }, data: { role: "PLAYER" } });
+          }
+        } catch {}
+      }
+      return true;
+    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
