@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,13 +14,27 @@ const TESTIMONIALS = [
   { quote: "Finally no double booking drama. The slot I pick stays mine.", name: "Priya Nair", role: "Cricket enthusiast, Hyderabad", emoji: "🏏" },
 ];
 
+const AUTH_ERRORS: Record<string, string> = {
+  OAuthAccountNotLinked: "This email is registered with a password. Please log in with email & password instead.",
+  OAuthSignin: "Google sign-in failed. Please try again.",
+  OAuthCallback: "Google sign-in failed. Please try again.",
+  Callback: "Sign-in failed. Please try again.",
+  Default: "Something went wrong. Please try again.",
+};
+
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({ email: "", password: "" });
+
+  useEffect(() => {
+    const urlError = searchParams.get("error");
+    if (urlError) setError(AUTH_ERRORS[urlError] ?? AUTH_ERRORS.Default);
+  }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

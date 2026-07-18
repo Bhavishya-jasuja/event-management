@@ -28,7 +28,12 @@ const SPORTS = [
 
 export default async function PlayerDashboardPage() {
   const session = await auth();
-  if (!session || session.user.role !== "PLAYER") redirect("/login");
+  if (!session) redirect("/login");
+  if (session.user.role !== "PLAYER") {
+    if (session.user.role === "ADMIN") redirect("/admin/dashboard");
+    if (session.user.role === "OWNER") redirect("/owner/dashboard");
+    redirect("/login");
+  }
 
   const raw = await prisma.booking.findMany({
     where: { playerId: session.user.id },
